@@ -1,26 +1,57 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
-
-export function RevealObserver() {
-  useEffect(() => {
-    const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("is-in"); io.unobserve(e.target) } }), { threshold: 0.12 })
-    document.querySelectorAll("[data-reveal]").forEach((el) => io.observe(el))
-    return () => io.disconnect()
-  }, [])
-  return null
-}
+import { CircleDollarSign, ClipboardCheck } from "lucide-react"
 
 function Frame({ src, alt, priority = false }: { src: string; alt: string; priority?: boolean }) {
-  return <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#16151a] shadow-2xl shadow-[#8f0038]/25">
-    <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-3"><span className="size-2.5 rounded-full bg-[#ff5f57]" /><span className="size-2.5 rounded-full bg-[#febc2e]" /><span className="size-2.5 rounded-full bg-[#28c840]" /></div>
-    <Image src={src} alt={alt} width={1600} height={742} priority={priority} className="h-auto w-full" />
-  </div>
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-ink shadow-2xl shadow-primary/25">
+      <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-3" aria-hidden>
+        <span className="size-2.5 rounded-full bg-white/20" />
+        <span className="size-2.5 rounded-full bg-white/20" />
+        <span className="size-2.5 rounded-full bg-white/20" />
+      </div>
+      <Image src={src} alt={alt} width={1600} height={742} priority={priority} className="h-auto w-full" />
+    </div>
+  )
 }
 
+/** Captura real del panel con dos avisos ilustrativos que aparecen una sola vez, en orden, al cargar. */
 export function HeroShot() {
-  return <div className="float relative mx-auto w-full max-w-[640px]"><Frame src="/screens/dashboard.webp" alt="Panel principal de CheerManager con deportistas, cartera y asistencia" priority /></div>
+  return (
+    <div className="hero-rise relative mx-auto w-full max-w-[640px]" style={{ "--d": "250ms" } as React.CSSProperties}>
+      <Frame src="/screens/dashboard.webp" alt="Panel principal de CheerManager con deportistas, cartera y asistencia" priority />
+
+      <div
+        aria-hidden
+        className="chip-in absolute -left-3 bottom-8 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-xl sm:-left-10"
+        style={{ "--d": "900ms" } as React.CSSProperties}
+      >
+        <span className="grid size-9 place-items-center rounded-xl bg-primary-soft text-brand">
+          <CircleDollarSign size={18} />
+        </span>
+        <div>
+          <p className="text-[11px] text-muted-foreground">Pago registrado</p>
+          <p className="text-sm font-bold">Mensualidad del mes</p>
+        </div>
+      </div>
+
+      <div
+        aria-hidden
+        className="chip-in absolute -right-2 top-14 hidden items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-xl sm:flex lg:-right-6"
+        style={{ "--d": "1150ms" } as React.CSSProperties}
+      >
+        <span className="grid size-9 place-items-center rounded-xl bg-primary-soft text-brand">
+          <ClipboardCheck size={18} />
+        </span>
+        <div>
+          <p className="text-[11px] text-muted-foreground">Asistencia guardada</p>
+          <p className="text-sm font-bold">14 de 16 presentes</p>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const tabs = [
@@ -34,10 +65,71 @@ const tabs = [
 
 export function Showcase() {
   const [i, setI] = useState(0)
+  const refs = useRef<(HTMLButtonElement | null)[]>([])
   const t = tabs[i]
-  return <section id="producto" className="bg-[#19171c] py-24 text-white"><div className="mx-auto max-w-7xl px-5 sm:px-8">
-    <div data-reveal className="mx-auto max-w-2xl text-center"><p className="mb-3 text-xs font-extrabold uppercase tracking-[0.2em] text-[#f2b7ca]">El producto</p><h2 className="text-balance text-3xl font-black tracking-[-0.05em] sm:text-5xl">Así se ve CheerManager por dentro.</h2></div>
-    <div role="tablist" className="mt-10 flex flex-wrap justify-center gap-2">{tabs.map((x, n) => <button key={x.id} role="tab" aria-selected={n === i} onClick={() => setI(n)} className={`rounded-full px-4 py-2 text-sm font-bold transition ${n === i ? "bg-white text-[#8f0038]" : "bg-white/10 text-white/70 hover:bg-white/15"}`}>{x.label}</button>)}</div>
-    <div data-reveal className="mx-auto mt-10 max-w-5xl"><div key={t.id} className="shot-in"><Frame src={t.src} alt={t.title} /></div><div className="mt-7 text-center"><h3 className="text-xl font-black">{t.title}</h3><p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-white/60">{t.copy}</p></div></div>
-  </div></section>
+
+  // El recorrido de Isa abre la pestaña que toca mostrar.
+  useEffect(() => {
+    const onTab = (e: Event) => {
+      const d = (e as CustomEvent<{ group: string; id: string }>).detail
+      if (d?.group !== "producto") return
+      const idx = tabs.findIndex((x) => x.id === d.id)
+      if (idx >= 0) setI(idx)
+    }
+    window.addEventListener("cm:tab", onTab)
+    return () => window.removeEventListener("cm:tab", onTab)
+  }, [])
+
+  function onKey(event: React.KeyboardEvent, n: number) {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0
+    if (!step) return
+    event.preventDefault()
+    const next = (n + step + tabs.length) % tabs.length
+    setI(next)
+    refs.current[next]?.focus()
+  }
+
+  return (
+    <section id="producto" className="bg-ink py-24 text-ink-foreground">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-5xl">Así se ve CheerManager por dentro.</h2>
+          <p className="mt-4 text-base leading-7 text-white/60">Capturas del sistema con datos de muestra.</p>
+        </div>
+
+        <div role="tablist" aria-label="Pantallas del sistema" className="mt-10 flex flex-wrap justify-center gap-2">
+          {tabs.map((x, n) => (
+            <button
+              key={x.id}
+              ref={(el) => {
+                refs.current[n] = el
+              }}
+              role="tab"
+              id={`tab-${x.id}`}
+              aria-selected={n === i}
+              aria-controls="panel-producto"
+              tabIndex={n === i ? 0 : -1}
+              onClick={() => setI(n)}
+              onKeyDown={(e) => onKey(e, n)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-150 active:scale-[.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-glow ${
+                n === i ? "bg-white text-primary" : "bg-white/10 text-white/70 hover:bg-white/15"
+              }`}
+            >
+              {x.label}
+            </button>
+          ))}
+        </div>
+
+        <div id="panel-producto" role="tabpanel" aria-labelledby={`tab-${t.id}`} className="mx-auto mt-10 max-w-5xl">
+          <div key={t.id} className="panel-in">
+            <Frame src={t.src} alt={t.title} />
+            <div className="mt-7 text-center">
+              <h3 className="text-xl font-bold">{t.title}</h3>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-white/60">{t.copy}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
 }

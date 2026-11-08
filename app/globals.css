@@ -9,6 +9,11 @@
    Los tokens HSL de :root/.dark son los mismos de la app; @theme los expone
    como utilidades (bg-primary, text-muted-foreground, border-border, ...).
    Ya NO se usa tailwind.config.js: bórralo.
+
+   Tokens añadidos para la landing:
+     brand : el vino cuando se usa como TEXTO (en oscuro se aclara para leerse)
+     glow  : rosa de acento sobre fondos de vino o tinta
+     ink   : paneles que son oscuros también en modo claro (= sidebar)
    ========================================================================= */
 
 @theme inline {
@@ -22,6 +27,8 @@
   --color-primary-foreground: hsl(var(--primary-foreground));
   --color-primary-hover: hsl(var(--primary-hover));
   --color-primary-soft: hsl(var(--primary-soft));
+  --color-brand: hsl(var(--brand));
+  --color-glow: hsl(var(--glow));
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
   --color-muted: hsl(var(--muted));
@@ -43,6 +50,8 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+  --color-ink: hsl(var(--sidebar-background));
+  --color-ink-foreground: hsl(var(--sidebar-foreground));
   --color-sidebar: hsl(var(--sidebar-background));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
   --color-sidebar-muted: hsl(var(--sidebar-muted));
@@ -67,6 +76,14 @@
   --font-mono: var(--font-jetbrains, "JetBrains Mono"), ui-monospace, SFMono-Regular, monospace;
 }
 
+/* Curvas de movimiento. Al redefinir ease-out / ease-in-out, las clases
+   `ease-out` de Tailwind usan estas curvas fuertes en vez de las suaves por
+   defecto. `static` para que siempre existan como variables CSS. */
+@theme static {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
 @layer base {
   :root {
     --background: 350 60% 98%;
@@ -80,6 +97,8 @@
     --primary-foreground: 0 0% 100%;
     --primary-hover: 343 79% 22%;
     --primary-soft: 346 58% 94%;
+    --brand: 343 79% 28%;
+    --glow: 340 85% 68%;
 
     --secondary: 346 30% 95%;
     --secondary-foreground: 270 18% 9%;
@@ -136,6 +155,8 @@
     --primary-foreground: 0 0% 100%;
     --primary-hover: 343 76% 42%;
     --primary-soft: 339 45% 11%;
+    --brand: 343 84% 68%;
+    --glow: 340 85% 68%;
 
     --secondary: 280 12% 17%;
     --secondary-foreground: 340 23% 95%;
@@ -189,6 +210,12 @@
   h1, h2, h3, h4 {
     @apply font-display tracking-tight;
   }
+  html {
+    scroll-behavior: smooth;
+  }
+  section[id] {
+    scroll-margin-top: 5rem;
+  }
   .font-figures {
     font-family: var(--font-mono);
     font-feature-settings: "tnum" 1, "zero" 1;
@@ -209,15 +236,113 @@
   }
 }
 
-/* ---- Animaciones de la landing ---- */
-[data-reveal]{opacity:0;transform:translateY(24px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
-[data-reveal].is-in{opacity:1;transform:none}
-[data-reveal="group"]{opacity:1;transform:none}
-[data-reveal="group"]>*{opacity:0;transform:translateY(24px);transition:opacity .6s cubic-bezier(.2,.7,.2,1),transform .6s cubic-bezier(.2,.7,.2,1),translate .2s,border-color .2s,box-shadow .2s,background-color .2s}
-[data-reveal="group"].is-in>*{opacity:1;transform:none}
-[data-reveal="group"].is-in>*:nth-child(2){transition-delay:.08s}[data-reveal="group"].is-in>*:nth-child(3){transition-delay:.16s}[data-reveal="group"].is-in>*:nth-child(4){transition-delay:.24s}[data-reveal="group"].is-in>*:nth-child(5){transition-delay:.32s}[data-reveal="group"].is-in>*:nth-child(n+6){transition-delay:.4s}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-.float{animation:float 6s ease-in-out infinite}
-@keyframes shot-in{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
-.shot-in{animation:shot-in .45s ease-out}
-@media (prefers-reduced-motion:reduce){[data-reveal],[data-reveal]>*{opacity:1!important;transform:none!important;transition:none!important}.float,.shot-in{animation:none}}
+/* =========================================================================
+   Movimiento
+   Reglas: solo transform y opacity; entradas con ease-out fuerte; lo que se
+   activa seguido (botones, pestañas) usa transiciones, no keyframes.
+   ========================================================================= */
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } }
+@keyframes fade { from { opacity: 0; } }
+
+/* Aparición al hacer scroll, solo en cuadrículas de tarjetas. Solo se oculta
+   si JS corrió (clase `js` en <html>); sin JS el contenido se ve igual. Es
+   animación (no transición) para que el retraso no se herede al hover. */
+html.js [data-reveal="group"]:not(.is-in) > * { opacity: 0; }
+[data-reveal="group"].is-in > * { animation: rise .5s var(--ease-out) backwards; }
+[data-reveal="group"].is-in > :nth-child(2) { animation-delay: .06s; }
+[data-reveal="group"].is-in > :nth-child(3) { animation-delay: .12s; }
+[data-reveal="group"].is-in > :nth-child(4) { animation-delay: .18s; }
+[data-reveal="group"].is-in > :nth-child(5) { animation-delay: .24s; }
+[data-reveal="group"].is-in > :nth-child(n+6) { animation-delay: .3s; }
+
+/* Hero: una sola secuencia al cargar */
+@keyframes word-in { from { opacity: 0; transform: translateY(.4em); } }
+.word { display: inline-block; animation: word-in .7s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 55ms + 80ms); }
+.hero-rise { animation: rise .7s var(--ease-out) backwards; animation-delay: var(--d, 0ms); }
+@keyframes chip-in { from { opacity: 0; transform: translateY(14px) scale(.96); } }
+.chip-in { animation: chip-in .5s var(--ease-out) backwards; animation-delay: var(--d, 0ms); }
+
+.hero-glow {
+  background:
+    radial-gradient(60% 50% at 85% 8%, hsl(var(--primary) / .14), transparent),
+    radial-gradient(40% 40% at 4% 62%, hsl(var(--primary) / .08), transparent);
+}
+
+/* Punto "en vivo" */
+@keyframes ping-ring { 0% { transform: scale(1); opacity: .6; } 80%, 100% { transform: scale(2.6); opacity: 0; } }
+.pulse-dot { position: relative; display: inline-block; width: .5rem; height: .5rem; border-radius: 9999px; background: hsl(var(--primary)); }
+.pulse-dot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: inherit; animation: ping-ring 2s var(--ease-out) infinite; }
+
+/* Cinta de módulos: movimiento constante = linear */
+@keyframes marquee { to { transform: translateX(-50%); } }
+.marquee {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.marquee-track { display: flex; width: max-content; animation: marquee 50s linear infinite; }
+@media (hover: hover) and (pointer: fine) {
+  .marquee:hover .marquee-track { animation-play-state: paused; }
+}
+
+/* Cambio de pestaña / de paso */
+@keyframes panel-in { from { opacity: 0; transform: translateY(8px) scale(.99); } }
+.panel-in { animation: panel-in .3s var(--ease-out); }
+.row-in { animation: panel-in .35s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 60ms + 60ms); }
+@keyframes step-fwd { from { opacity: 0; transform: translateX(16px); } }
+@keyframes step-back { from { opacity: 0; transform: translateX(-16px); } }
+.step-in { animation: step-fwd .3s var(--ease-out); }
+.step-in[data-dir="back"] { animation-name: step-back; }
+
+/* Cifra del contador y confirmación del pre-registro */
+@keyframes tick { from { opacity: .2; transform: translateY(-35%); } }
+.tick { display: inline-block; animation: tick .25s var(--ease-out); }
+@keyframes pop { from { opacity: 0; transform: scale(.7); } }
+.pop { animation: pop .45s var(--ease-out) backwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.draw-check { stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw .45s .2s var(--ease-out) forwards; }
+
+/* Acordeón: único lugar donde se anima el alto (no hay equivalente con transform) */
+.acc { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .25s var(--ease-out), opacity .2s var(--ease-out); }
+.acc > div { overflow: hidden; }
+.acc[data-open="true"] { grid-template-rows: 1fr; opacity: 1; }
+
+/* Foto de fondo del hero: se desvanece hacia la izquierda y hacia abajo */
+.hero-photo {
+  -webkit-mask-image: linear-gradient(to left, #000 25%, transparent 95%), linear-gradient(to bottom, #000 55%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to left, #000 25%, transparent 95%), linear-gradient(to bottom, #000 55%, transparent);
+  mask-composite: intersect;
+}
+
+/* Recorrido de Isa: anillo alrededor del bloque que se está explicando */
+.guide-focus { position: relative; scroll-margin-top: 6.5rem; }
+.guide-focus::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 1.5rem;
+  border: 2px solid hsl(var(--glow));
+  box-shadow: 0 0 0 6px hsl(var(--primary) / .12);
+  pointer-events: none;
+  z-index: 5;
+  animation: fade .35s var(--ease-out);
+}
+
+/* Movimiento reducido: menos y más suave, no cero. Se conservan los fundidos
+   que ayudan a entender; se quitan desplazamientos y bucles. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .word, .hero-rise, .chip-in, .panel-in, .row-in, .step-in, .step-in[data-dir],
+  .pop, [data-reveal="group"].is-in > * {
+    animation-name: fade;
+    animation-delay: 0ms;
+    animation-duration: .25s;
+  }
+  .marquee-track, .pulse-dot::after, .tick { animation: none; }
+  .draw-check { animation: none; stroke-dashoffset: 0; }
+  .marquee-track { width: auto; }
+  .marquee-track > ul { flex-shrink: 1; flex-wrap: wrap; justify-content: center; }
+  .marquee-track > ul[aria-hidden="true"] { display: none; }
+  .acc { transition: opacity .2s; }
+}
